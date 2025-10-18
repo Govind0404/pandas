@@ -1,5 +1,6 @@
 FROM python:3.11.13
-WORKDIR /home/pandas
+# Align with agent-wrapper detected workdir
+WORKDIR /app
 
 # https://docs.docker.com/reference/dockerfile/#automatic-platform-args-in-the-global-scope
 ARG TARGETPLATFORM
@@ -25,7 +26,12 @@ RUN case "$TARGETPLATFORM" in \
     esac && \
     python -m pip install --no-cache-dir --upgrade pip && \
     python -m pip install --no-cache-dir -r /tmp/requirements-dev.txt
-RUN git config --global --add safe.directory /home/pandas
+
+# Copy the repository into /app so agent-wrapper can chown and run tests
+COPY . /app
+
+# Configure git safe directory to current workdir
+RUN git config --global --add safe.directory /app
 
 ENV SHELL="/bin/bash"
 CMD ["/bin/bash"]
