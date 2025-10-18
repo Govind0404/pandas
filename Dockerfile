@@ -24,7 +24,6 @@ RUN case "$TARGETPLATFORM" in \
         sed -i "/^pyqt5/Id" /tmp/requirements-dev.txt \
         ;; \
     esac && \
-    python -m pip install --no-cache-dir --upgrade pip && \
     python -m pip install --no-cache-dir -r /tmp/requirements-dev.txt
 
 # Copy the repository into /app so agent-wrapper can chown and run tests
