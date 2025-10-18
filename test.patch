@@ -1,215 +1,84 @@
-diff --git a/pandas/tests/frame/test_new_functionality.py b/pandas/tests/frame/test_new_functionality.py
+diff --git a/pandas/tests/groupby/test_weighted_mean.py b/pandas/tests/groupby/test_weighted_mean.py
 new file mode 100644
 index 0000000000..1111111111
 --- /dev/null
-+++ b/pandas/tests/frame/test_new_functionality.py
-@@ -0,0 +1,165 @@
-+from pandas import DataFrame
++++ b/pandas/tests/groupby/test_weighted_mean.py
+@@ -0,0 +1,200 @@
 +import numpy as np
-+from custom_weighted_avg import customWeightedAvg
++import pandas as pd
 +
 +
-+class TestCustomWeightedAvg:
-+    """Tests for customWeightedAvg function that should fail before implementation."""
++class TestGroupByWeightedMean:
++    def test_series_groupby_weighted_mean_basic(self):
++        df = pd.DataFrame({"g": ["A", "A", "B", "B"], "v": [10.0, 20.0, 5.0, 15.0], "w": [1.0, 3.0, 2.0, 2.0]})
++        out = df.groupby("g")["v"].weighted_mean(weights="w")
++        expected = pd.Series([17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v")
++        pd.testing.assert_series_equal(out, expected)
 +
-+    def test_basic_weighted_average(self):
-+        """Test basic weighted average calculation."""
-+        df = DataFrame(
++    def test_series_groupby_weights_series_misaligned_aligns_by_index(self):
++        df = pd.DataFrame({"g": ["A", "A", "B", "B"], "v": [10.0, 20.0, 5.0, 15.0]})
++        w = pd.Series([3.0, 1.0, 2.0, 2.0], index=[1, 0, 3, 2])  # same labels, different order
++        out = df.groupby("g")["v"].weighted_mean(weights=w)
++        expected = pd.Series([17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v")
++        pd.testing.assert_series_equal(out, expected)
++
++    def test_zero_total_weight_results_nan(self):
++        df = pd.DataFrame({"g": ["A", "A", "B", "B"], "v": [10.0, 20.0, 5.0, 15.0], "w": [0.0, 0.0, 2.0, 2.0]})
++        out = df.groupby("g")["v"].weighted_mean(weights="w")
++        expected = pd.Series([np.nan, 10.0], index=pd.Index(["A", "B"], name="g"), name="v")
++        pd.testing.assert_series_equal(out, expected)
++
++    def test_missing_values_and_weights_skipped(self):
++        df = pd.DataFrame(
 +            {
-+                "group": ["A", "A", "B", "B"],
-+                "value": [10, 20, 5, 15],
-+                "weight": [1, 3, 2, 2],
++                "g": ["A", "A", "B", "B"],
++                "v": [10.0, np.nan, 5.0, 15.0],
++                "w": [1.0, 3.0, 2.0, np.nan],
 +            }
 +        )
++        out = df.groupby("g")["v"].weighted_mean(weights="w")
++        expected = pd.Series([10.0, 5.0], index=pd.Index(["A", "B"], name="g"), name="v")
++        pd.testing.assert_series_equal(out, expected)
 +
-+        # This function should not exist yet - test should fail
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        assert result.index.name == "group"
-+        assert "weighted_avg" in result.columns
-+        assert len(result) == 2
-+        # Validate actual weighted average values
-+        assert (
-+            abs(result.loc["A", "weighted_avg"] - 17.5) < 1e-10
-+        )  # (10*1 + 20*3) / (1+3) = 70/4 = 17.5
-+        assert (
-+            abs(result.loc["B", "weighted_avg"] - 10.0) < 1e-10
-+        )  # (5*2 + 15*2) / (2+2) = 40/4 = 10.0
-+
-+    def test_weighted_average_with_missing_values(self):
-+        """Test weighted average with missing values in value column."""
-+        df = DataFrame(
++    def test_multiindex_grouper(self):
++        df = pd.DataFrame(
 +            {
-+                "group": ["A", "A", "B", "B"],
-+                "value": [10, np.nan, 5, 15],
-+                "weight": [1, 3, 2, 2],
++                "g1": ["A", "A", "B", "B"],
++                "g2": [1, 2, 1, 2],
++                "v": [10.0, 20.0, 5.0, 15.0],
++                "w": [1.0, 3.0, 2.0, 2.0],
 +            }
 +        )
++        out = df.groupby(["g1", "g2"])["v"].weighted_mean(weights="w")
++        idx = pd.MultiIndex.from_product([["A", "B"], [1, 2]], names=["g1", "g2"])
++        expected = pd.Series([10.0, 20.0, 5.0, 15.0], index=idx, name="v")
++        pd.testing.assert_series_equal(out.sort_index(), expected)
 +
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        assert len(result) == 2
-+        # Validate actual weighted average values (missing value should be ignored)
-+        assert (
-+            abs(result.loc["A", "weighted_avg"] - 10.0) < 1e-10
-+        )  # Only 10*1 / 1 = 10.0
-+        assert (
-+            abs(result.loc["B", "weighted_avg"] - 10.0) < 1e-10
-+        )  # (5*2 + 15*2) / (2+2) = 40/4 = 10.0
++    def test_categorical_grouper_preserves_order(self):
++        cat = pd.Categorical(["Z", "A", "M", "B"], categories=["A", "B", "M", "Z"], ordered=True)
++        df = pd.DataFrame({"g": cat, "v": [10.0, 20.0, 5.0, 15.0], "w": [1.0, 3.0, 2.0, 2.0]})
++        out = df.groupby("g")["v"].weighted_mean(weights="w")
++        expected = pd.Series([20.0, 15.0, 5.0, 17.5], index=pd.Index(cat.categories, name="g"), name="v")
++        pd.testing.assert_series_equal(out, expected)
 +
-+    def test_weighted_average_with_missing_weights(self):
-+        """Test weighted average with missing weights treated as zero."""
-+        df = DataFrame(
-+            {
-+                "group": ["A", "A", "B", "B"],
-+                "value": [10, 20, 5, 15],
-+                "weight": [1, np.nan, 2, 2],
-+            }
-+        )
++    def test_dataframe_groupby_single_column_selection_returns_series(self):
++        df = pd.DataFrame({"g": ["A", "A", "B", "B"], "v": [10.0, 20.0, 5.0, 15.0], "w": [1.0, 3.0, 2.0, 2.0]})
++        gb = df.groupby("g")["v"]
++        out = gb.weighted_mean(weights=df["w"])  # Series weights
++        assert isinstance(out, pd.Series)
++        expected = pd.Series([17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v")
++        pd.testing.assert_series_equal(out, expected)
 +
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        # Validate actual weighted average values (missing weight treated as 0)
-+        assert (
-+            abs(result.loc["A", "weighted_avg"] - 10.0) < 1e-10
-+        )  # Only 10*1 / 1 = 10.0
-+        assert (
-+            abs(result.loc["B", "weighted_avg"] - 10.0) < 1e-10
-+        )  # (5*2 + 15*2) / (2+2) = 40/4 = 10.0
++    def test_non_numeric_raises(self):
++        df = pd.DataFrame({"g": ["A", "A"], "v": ["x", "y"], "w": [1.0, 2.0]})
++        with pd.testing.assert_raises_regex(TypeError, "non-numeric"):
++            _ = df.groupby("g")["v"].weighted_mean(weights="w")
 +
-+    def test_weighted_average_all_missing_values_excluded(self):
-+        """Test groups with all missing values are excluded."""
-+        df = DataFrame(
-+            {
-+                "group": ["A", "A", "B", "B"],
-+                "value": [10, 20, np.nan, np.nan],
-+                "weight": [1, 3, 2, 2],
-+            }
-+        )
-+
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        assert len(result) == 1  # Only group A should remain
-+        assert "A" in result.index
-+        assert "B" not in result.index
-+        # Validate actual weighted average value for remaining group
-+        assert (
-+            abs(result.loc["A", "weighted_avg"] - 17.5) < 1e-10
-+        )  # (10*1 + 20*3) / (1+3) = 70/4 = 17.5
-+
-+    def test_weighted_average_empty_dataframe(self):
-+        """Test weighted average with empty DataFrame."""
-+        df = DataFrame(columns=["group", "value", "weight"])
-+
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        assert len(result) == 0
-+
-+    def test_weighted_average_single_row_groups(self):
-+        """Test weighted average with single row groups."""
-+        df = DataFrame(
-+            {"group": ["A", "B", "C"], "value": [10, 20, 30], "weight": [1, 2, 3]}
-+        )
-+
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        assert len(result) == 3
-+        # Validate actual weighted average values (single row groups)
-+        assert abs(result.loc["A", "weighted_avg"] - 10.0) < 1e-10  # 10*1 / 1 = 10.0
-+        assert abs(result.loc["B", "weighted_avg"] - 20.0) < 1e-10  # 20*2 / 2 = 20.0
-+        assert abs(result.loc["C", "weighted_avg"] - 30.0) < 1e-10  # 30*3 / 3 = 30.0
-+
-+    def test_weighted_average_zero_weights(self):
-+        """Test weighted average with zero weights."""
-+        df = DataFrame(
-+            {
-+                "group": ["A", "A", "B", "B"],
-+                "value": [10, 20, 5, 15],
-+                "weight": [0, 3, 0, 2],
-+            }
-+        )
-+
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        # Validate actual weighted average values (zero weights ignored)
-+        assert (
-+            abs(result.loc["A", "weighted_avg"] - 20.0) < 1e-10
-+        )  # Only 20*3 / 3 = 20.0
-+        assert (
-+            abs(result.loc["B", "weighted_avg"] - 15.0) < 1e-10
-+        )  # Only 15*2 / 2 = 15.0
-+
-+    def test_weighted_average_zero_total_weight_excluded(self):
-+        """Test groups with zero total effective weight are excluded."""
-+        df = DataFrame(
-+            {
-+                "group": ["A", "A", "B", "B"],
-+                "value": [10, 20, 5, 15],
-+                "weight": [0, 0, 2, 2],  # Group A has zero total weight
-+            }
-+        )
-+
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        assert len(result) == 1  # Only group B should remain
-+        assert "A" not in result.index
-+        assert "B" in result.index
-+        # Validate actual weighted average value for remaining group
-+        assert (
-+            abs(result.loc["B", "weighted_avg"] - 10.0) < 1e-10
-+        )  # (5*2 + 15*2) / (2+2) = 40/4 = 10.0
-+
-+    def test_weighted_average_sorting_by_group(self):
-+        """Test that output is sorted by group name."""
-+        df = DataFrame(
-+            {
-+                "group": ["Z", "A", "M", "B"],
-+                "value": [10, 20, 5, 15],
-+                "weight": [1, 3, 2, 2],
-+            }
-+        )
-+
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert isinstance(result, DataFrame)
-+        assert list(result.index) == ["A", "B", "M", "Z"]
-+
-+    def test_weighted_average_deterministic_output(self):
-+        """Test that same input produces same output."""
-+        df = DataFrame(
-+            {
-+                "group": ["A", "A", "B", "B"],
-+                "value": [10, 20, 5, 15],
-+                "weight": [1, 3, 2, 2],
-+            }
-+        )
-+
-+        # This function should not exist yet
-+        result1 = customWeightedAvg(df)
-+        result2 = customWeightedAvg(df)
-+        assert result1.equals(result2)
-+
-+    def test_weighted_average_input_not_modified(self):
-+        """Test that input DataFrame is not modified."""
-+        df = DataFrame(
-+            {
-+                "group": ["A", "A", "B", "B"],
-+                "value": [10, 20, 5, 15],
-+                "weight": [1, 3, 2, 2],
-+            }
-+        )
-+        original_df = df.copy()
-+
-+        # This function should not exist yet
-+        result = customWeightedAvg(df)
-+        assert df.equals(original_df)
++    def test_length_mismatch_raises(self):
++        df = pd.DataFrame({"g": ["A", "A", "B"], "v": [1.0, 2.0, 3.0]})
++        with pd.testing.assert_raises_regex(ValueError, "length|shape"):
++            _ = df.groupby("g")["v"].weighted_mean(weights=[1.0, 2.0])
+
 diff --git a/test.sh b/test.sh
 new file mode 100755
 index 0000000000..2222222222
@@ -221,12 +90,12 @@ index 0000000000..2222222222
 +
 +case "$1" in
 +  base)
-+    # Run existing tests - should pass at base commit
++    # Run an existing, stable test that should pass at base commit
 +    pytest -q pandas/tests/frame/test_constructors.py::TestDataFrameConstructors::test_construct_from_list_of_datetimes
 +    ;;
 +  new)
-+    # Run newly added tests - should fail before solution
-+    pytest -q pandas/tests/frame/test_new_functionality.py
++    # Run the newly added tests that should fail before implementation
++    pytest -q pandas/tests/groupby/test_weighted_mean.py
 +    ;;
 +  *)
 +    echo "Usage: ./test.sh {base|new}"
