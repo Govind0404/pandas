@@ -1,4 +1,4 @@
-FROM python:3.11.13
+FROM public.ecr.aws/x8v8d7g8/mars-base:latest
 # Align with agent-wrapper detected workdir
 WORKDIR /app
 
