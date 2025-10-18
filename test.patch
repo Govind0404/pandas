@@ -1,9 +1,9 @@
 diff --git a/pandas/tests/groupby/test_weighted_mean.py b/pandas/tests/groupby/test_weighted_mean.py
 new file mode 100644
-index 0000000000..1111111111
+index 0000000000..2b32285ea5
 --- /dev/null
 +++ b/pandas/tests/groupby/test_weighted_mean.py
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,74 @@
 +import numpy as np
 +import pandas as pd
 +
@@ -78,10 +78,9 @@ index 0000000000..1111111111
 +        df = pd.DataFrame({"g": ["A", "A", "B"], "v": [1.0, 2.0, 3.0]})
 +        with pd.testing.assert_raises_regex(ValueError, "length|shape"):
 +            _ = df.groupby("g")["v"].weighted_mean(weights=[1.0, 2.0])
-
 diff --git a/test.sh b/test.sh
-new file mode 100755
-index 0000000000..2222222222
+new file mode 100644
+index 0000000000..556c8cf27c
 --- /dev/null
 +++ b/test.sh
 @@ -0,0 +1,17 @@
