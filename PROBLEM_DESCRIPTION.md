@@ -6,8 +6,8 @@ Users frequently need a weighted mean per group. Today this requires ad‑hoc pa
 ## 2) Agent Instructions
 Implement a weighted-mean reduction available on pandas GroupBy with the following behavior:
 - Public surface
-  - `SeriesGroupBy.weighted_mean(weights, *, numeric_only=None) -> Series`.
-  - `DataFrameGroupBy.weighted_mean(weights, *, numeric_only=None)` when a single column is selected (e.g., `df.groupby(keys)["v"].weighted_mean(...)`) returns a `Series`.
+  - `SeriesGroupBy.weighted_mean(weights, *, numeric_only=None) -> Series` (e.g., `df.groupby(keys)["v"].weighted_mean(...)`).
+  - `DataFrameGroupBy.weighted_mean(weights, *, numeric_only=None)` on a single-column DataFrame GroupBy (e.g., `df[["v"]].groupby(keys).weighted_mean(...)`) returns a `Series`.
   - The `numeric_only` parameter is accepted for signature compatibility but does not need special handling for this task.
 - Weights may be one of:
   1) A column name (str) from the original object,
