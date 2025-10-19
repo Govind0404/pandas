@@ -1,4 +1,4 @@
-"diff --git a/pandas/tests/groupby/test_weighted_mean.py b/pandas/tests/groupby/test_weighted_mean.py
+diff --git a/pandas/tests/groupby/test_weighted_mean.py b/pandas/tests/groupby/test_weighted_mean.py
 new file mode 100644
 --- /dev/null
 +++ b/pandas/tests/groupby/test_weighted_mean.py
