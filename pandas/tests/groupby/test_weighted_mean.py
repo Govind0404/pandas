@@ -111,3 +111,53 @@ class TestGroupByWeightedMean:
         df = pd.DataFrame({"g": ["A", "A", "B"], "v": [1.0, 2.0, 3.0]})
         with pytest.raises(ValueError, match=".*"):
             _ = df.groupby("g")["v"].weighted_mean(weights=[1.0, 2.0])
+
+    def test_weights_array_like_numpy(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+            }
+        )
+        w = np.array([1.0, 3.0, 2.0, 2.0])
+        out = df.groupby("g")["v"].weighted_mean(weights=w)
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_dataframe_groupby_method_exists_and_single_column_df_returns_series(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, 2.0],
+            }
+        )
+        gobj = df.groupby("g")
+        assert hasattr(gobj, "weighted_mean") and callable(gobj.weighted_mean)
+
+        # DataFrameGroupBy over a single-column DataFrame should return a Series
+        gb_df = df[["v"]].groupby("g")
+        out = gb_df.weighted_mean(weights=df["w"])  # weights align by index
+        assert isinstance(out, pd.Series)
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_numeric_only_parameter_is_accepted(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, 2.0],
+            }
+        )
+        out_none = df.groupby("g")["v"].weighted_mean(weights="w", numeric_only=None)
+        out_true = df.groupby("g")["v"].weighted_mean(weights="w", numeric_only=True)
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out_none, expected)
+        tm.assert_series_equal(out_true, expected)
