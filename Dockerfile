@@ -1,5 +1,5 @@
-FROM python:3.11.13
-WORKDIR /home/pandas
+FROM public.ecr.aws/x8v8d7g8/mars-base:latest
+WORKDIR /app
 
 # https://docs.docker.com/reference/dockerfile/#automatic-platform-args-in-the-global-scope
 ARG TARGETPLATFORM
@@ -28,7 +28,7 @@ RUN case "$TARGETPLATFORM" in \
     python -m pip install --no-cache-dir -r /app/requirements-dev.txt
 
 # Configure git safe directory to current workdir
-RUN git config --global --add safe.directory /home/pandas
+RUN git config --global --add safe.directory /app
 
 ENV SHELL="/bin/bash"
 CMD ["/bin/bash"]
