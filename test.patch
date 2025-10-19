@@ -1,5 +1,6 @@
 diff --git a/pandas/tests/groupby/test_weighted_mean.py b/pandas/tests/groupby/test_weighted_mean.py
 new file mode 100644
+index 0000000..e8a3c91 100644
 --- /dev/null
 +++ b/pandas/tests/groupby/test_weighted_mean.py
 @@ -0,0 +113 @@
@@ -119,6 +120,7 @@ new file mode 100644
 +
 diff --git a/test.sh b/test.sh
 new file mode 100755
+index 0000000..c3f5e8d 100755
 --- /dev/null
 +++ b/test.sh
 @@ -0,0 +17 @@
