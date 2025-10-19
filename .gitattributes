@@ -84,3 +84,9 @@ pandas/tests/io/parser/data export-ignore
 
 # Include cibw script in sdist since it's needed for building wheels
 scripts/cibw_before_build.sh -export-ignore
+
+# Ensure consistent LF endings for shell scripts and patch files
+*.sh text eol=lf
+*.patch text eol=lf
+test.sh text eol=lf
+test.patch text eol=lf

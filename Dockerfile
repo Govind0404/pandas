@@ -15,16 +15,19 @@ RUN apt-get update && \
     libgles2-mesa-dev && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements-dev.txt /tmp
+# Copy the repository into /app so agent-wrapper can chown and run tests
+COPY . /app
 
+# Install development requirements AFTER repo is present, so editable/local refs work
 RUN case "$TARGETPLATFORM" in \
     linux/arm*) \
         # Drop PyQt5 for ARM GH#61037
-        sed -i "/^pyqt5/Id" /tmp/requirements-dev.txt \
+        sed -i "/^pyqt5/Id" /app/requirements-dev.txt \
         ;; \
     esac && \
-    python -m pip install --no-cache-dir --upgrade pip && \
-    python -m pip install --no-cache-dir -r /tmp/requirements-dev.txt
+    python -m pip install --no-cache-dir -r /app/requirements-dev.txt
+
+# Configure git safe directory to current workdir
 RUN git config --global --add safe.directory /home/pandas
 
 ENV SHELL="/bin/bash"
