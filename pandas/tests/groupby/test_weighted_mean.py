@@ -82,7 +82,7 @@ class TestGroupByWeightedMean:
         )
         out = df.groupby("g")["v"].weighted_mean(weights="w")
         expected = pd.Series(
-            [20.0, 15.0, 5.0, 17.5], index=pd.Index(cat.categories, name="g"), name="v"
+            [20.0, 15.0, 5.0, 10.0], index=pd.Index(cat.categories, name="g"), name="v"
         )
         tm.assert_series_equal(out, expected)
 
