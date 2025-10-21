@@ -1,32 +1,25 @@
 diff --git a/pandas/tests/groupby/test_weighted_mean.py b/pandas/tests/groupby/test_weighted_mean.py
-index 791e9f3bbe..6f7574a135 100644
+index 791e9f3bbe..6ffbb327fc 100644
 --- a/pandas/tests/groupby/test_weighted_mean.py
 +++ b/pandas/tests/groupby/test_weighted_mean.py
-@@ -104,12 +104,12 @@ class TestGroupByWeightedMean:
- 
+@@ -104,12 +104,14 @@ class TestGroupByWeightedMean:
+
      def test_non_numeric_raises(self):
          df = pd.DataFrame({"g": ["A", "A"], "v": ["x", "y"], "w": [1.0, 2.0]})
 -        with pytest.raises(TypeError, match=".*"):
 +        with pytest.raises(TypeError):
              _ = df.groupby("g")["v"].weighted_mean(weights="w")
- 
+
      def test_length_mismatch_raises(self):
          df = pd.DataFrame({"g": ["A", "A", "B"], "v": [1.0, 2.0, 3.0]})
 -        with pytest.raises(ValueError, match=".*"):
-+        with pytest.raises(ValueError):
++        with pytest.raises(
++            ValueError, match="weights must be the same length as the data"
++        ):
              _ = df.groupby("g")["v"].weighted_mean(weights=[1.0, 2.0])
- 
+
      def test_weights_array_like_numpy(self):
-@@ -135,7 +135,7 @@ class TestGroupByWeightedMean:
-             }
-         )
-         gobj = df.groupby("g")
--        assert hasattr(gobj, "weighted_mean") and callable(gobj.weighted_mean)
-+        assert hasattr(gobj, "weighted_mean") and callable(getattr(gobj, "weighted_mean"))
- 
-         # DataFrameGroupBy over a single-column DataFrame should return a Series
-         gb_df = df[["v"]].groupby("g")
-@@ -161,3 +161,26 @@ class TestGroupByWeightedMean:
+@@ -161,3 +163,64 @@ class TestGroupByWeightedMean:
          )
          tm.assert_series_equal(out_none, expected)
          tm.assert_series_equal(out_true, expected)
@@ -39,7 +32,7 @@ index 791e9f3bbe..6f7574a135 100644
 +                "w": [1.0, 3.0, 2.0, 2.0],
 +            }
 +        )
-+        gb = df.groupby("g")[ ["v", "w"] ]
++        gb = df.groupby("g")[["v", "w"]]
 +        with pytest.raises(NotImplementedError):
 +            _ = gb.weighted_mean(weights="w")
 +
@@ -53,12 +46,50 @@ index 791e9f3bbe..6f7574a135 100644
 +        bad_w = ["a", "b", "c", "d"]
 +        with pytest.raises(TypeError):
 +            _ = df.groupby("g")["v"].weighted_mean(weights=bad_w)
++
++    def test_all_zero_weights_return_nan_per_group(self):
++        df = pd.DataFrame(
++            {
++                "g": ["A", "A", "B", "B"],
++                "v": [10.0, 20.0, 5.0, 15.0],
++                "w": [0.0, 0.0, 0.0, 0.0],
++            }
++        )
++        result = df.groupby("g")["v"].weighted_mean(weights="w")
++        expected = pd.Series(
++            [np.nan, np.nan],
++            index=pd.Index(["A", "B"], name="g"),
++            name="v",
++        )
++        tm.assert_series_equal(result, expected)
++
++    def test_missing_weights_column_raises_keyerror(self):
++        df = pd.DataFrame(
++            {
++                "g": ["A", "A", "B", "B"],
++                "v": [10.0, 20.0, 5.0, 15.0],
++            }
++        )
++        with pytest.raises(KeyError):
++            _ = df.groupby("g")["v"].weighted_mean(weights="w")
++
++    def test_result_index_preserves_groupby_order(self):
++        df = pd.DataFrame(
++            {
++                "g": ["B", "A", "B", "C"],
++                "v": [1.0, 2.0, 3.0, 4.0],
++                "w": [1.0, 1.0, 3.0, 2.0],
++            }
++        )
++        result = df.groupby("g")["v"].weighted_mean(weights="w")
++        expected_index = df.groupby("g")["v"].count().index
++        tm.assert_index_equal(result.index, expected_index)
 diff --git a/test.sh b/test.sh
-new file mode 100644
-index 0000000000..40db5d7f44
+new file mode 100755
+index 0000000000..e118ed0c3d
 --- /dev/null
 +++ b/test.sh
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,27 @@
 +#!/bin/bash
 +set -euo pipefail
 +
@@ -73,8 +104,13 @@ index 0000000000..40db5d7f44
 +      pandas/tests/series/methods/test_nunique.py::test_nunique
 +    ;;
 + new)
-+   # Run the newly added tests that should fail before implementation
-+   pytest -q pandas/tests/groupby/test_weighted_mean.py
++   # Run only the newly added tests (should fail before implementation)
++   pytest -q \
++     pandas/tests/groupby/test_weighted_mean.py::TestGroupByWeightedMean::test_dataframe_groupby_multi_column_raises_notimplemented \
++     pandas/tests/groupby/test_weighted_mean.py::TestGroupByWeightedMean::test_non_numeric_weights_raises \
++     pandas/tests/groupby/test_weighted_mean.py::TestGroupByWeightedMean::test_all_zero_weights_return_nan_per_group \
++     pandas/tests/groupby/test_weighted_mean.py::TestGroupByWeightedMean::test_missing_weights_column_raises_keyerror \
++     pandas/tests/groupby/test_weighted_mean.py::TestGroupByWeightedMean::test_result_index_preserves_groupby_order
 +   ;;
 + *)
 +   echo "Usage: ./test.sh {base|new}"
