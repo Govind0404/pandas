@@ -1687,7 +1687,6 @@ class SeriesGroupBy(GroupBy[Series]):
         if not is_numeric_dtype(ser.dtype):
             raise TypeError("weighted_mean is only valid for numeric data")
 
-        # Resolve weights to a Series aligned to ser.index
         from pandas.core.frame import DataFrame  # local import to avoid cycles
 
         if isinstance(weights, str):
@@ -1709,14 +1708,12 @@ class SeriesGroupBy(GroupBy[Series]):
                 raise ValueError("weights must be the same length as the data")
             wser = Series(warr, index=ser.index)
 
-        # Align by index if needed
         if not wser.index.equals(ser.index):
             wser = wser.reindex(ser.index)
 
         if not is_numeric_dtype(wser.dtype):
             raise TypeError("weights must be numeric")
 
-        # Iterate groups and compute pairwise-dropna weighted mean
         results: list[float] = []
         splitter = self._grouper._get_splitter(ser)
         for group_ser in splitter:
