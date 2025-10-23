@@ -1663,6 +1663,81 @@ class SeriesGroupBy(GroupBy[Series]):
         result = self._op_via_apply("unique")
         return result
 
+    def weighted_mean(self, weights, numeric_only: bool | None = None) -> Series:
+        """
+        Compute the weighted mean of the Series within each group.
+
+        Parameters
+        ----------
+        weights : str | Series | array-like
+            The weights to apply. If a string, interpreted as a column name from
+            the original object used to form the GroupBy. If a Series, will be
+            aligned by index with the grouped Series. If array-like, must be 1-D
+            with the same length as the grouped Series.
+        numeric_only : bool | None, default None
+            Accepted for API compatibility; has no effect for Series.
+
+        Returns
+        -------
+        Series
+            Weighted mean per group as float64.
+        """
+        ser = self._obj_with_exclusions
+
+        if not is_numeric_dtype(ser.dtype):
+            raise TypeError("weighted_mean is only valid for numeric data")
+
+        from pandas.core.frame import DataFrame  # local import to avoid cycles
+
+        if isinstance(weights, str):
+            wser = None
+            for ping in self._grouper.groupings:
+                obj = getattr(ping, "obj", None)
+                if isinstance(obj, DataFrame) and weights in obj.columns:
+                    wser = obj[weights]
+                    break
+            if wser is None:
+                raise KeyError(weights)
+        elif isinstance(weights, Series):
+            wser = weights
+        else:
+            warr = np.asarray(weights)
+            if warr.ndim != 1:
+                raise ValueError("weights must be 1-D")
+            if len(warr) != len(ser):
+                raise ValueError("weights must be the same length as the data")
+            wser = Series(warr, index=ser.index)
+
+        if not wser.index.equals(ser.index):
+            wser = wser.reindex(ser.index)
+
+        if not is_numeric_dtype(wser.dtype):
+            raise TypeError("weights must be numeric")
+
+        results: list[float] = []
+        splitter = self._grouper._get_splitter(ser)
+        for group_ser in splitter:
+            w_sub = wser.reindex(group_ser.index)
+            mask = group_ser.notna() & w_sub.notna()
+            if mask.any():
+                v = group_ser[mask]
+                w = w_sub[mask]
+                sumw = w.sum()
+                if sumw == 0 or not np.isfinite(sumw):
+                    results.append(np.nan)
+                else:
+                    results.append((v * w).sum() / sumw)
+            else:
+                results.append(np.nan)
+
+        out = Series(
+            results, index=self._grouper.result_index, name=ser.name, dtype="float64"
+        )
+        if not self.as_index:
+            out = self._insert_inaxis_grouper(out)
+            out.index = default_index(len(out))
+        return out
+
 
 @set_module("pandas.api.typing")
 class DataFrameGroupBy(GroupBy[DataFrame]):
@@ -1755,6 +1830,22 @@ class DataFrameGroupBy(GroupBy[DataFrame]):
     2   3.0
     """
     )
+
+    def weighted_mean(self, weights, numeric_only: bool | None = None):
+        """
+        Compute the weighted mean for a single selected value column.
+
+        This exists primarily to mirror the SeriesGroupBy API. Select a single
+        column first (e.g., df[["col"]]) so the result is a Series.
+        """
+        obj = self._obj_with_exclusions
+        if getattr(obj, "ndim", 2) != 2 or obj.shape[1] != 1:
+            raise NotImplementedError(
+                "weighted_mean is only supported for a single selected column; "
+                "select one column before calling weighted_mean"
+            )
+        col = obj.columns[0]
+        return self[col].weighted_mean(weights=weights, numeric_only=numeric_only)
 
     def aggregate(self, func=None, *args, engine=None, engine_kwargs=None, **kwargs):
         """

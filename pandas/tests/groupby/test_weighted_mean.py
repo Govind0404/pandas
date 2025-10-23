@@ -1,0 +1,226 @@
+import numpy as np
+import pytest
+
+import pandas as pd
+import pandas._testing as tm
+
+
+class TestGroupByWeightedMean:
+    def test_series_groupby_weighted_mean_basic(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, 2.0],
+            }
+        )
+        out = df.groupby("g")["v"].weighted_mean(weights="w")
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_series_groupby_weights_series_misaligned_aligns_by_index(self):
+        df = pd.DataFrame({"g": ["A", "A", "B", "B"], "v": [10.0, 20.0, 5.0, 15.0]})
+        w = pd.Series(
+            [3.0, 1.0, 2.0, 2.0], index=[1, 0, 3, 2]
+        )  # same labels, different order
+        out = df.groupby("g")["v"].weighted_mean(weights=w)
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_zero_total_weight_results_nan(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [0.0, 0.0, 2.0, 2.0],
+            }
+        )
+        out = df.groupby("g")["v"].weighted_mean(weights="w")
+        expected = pd.Series(
+            [np.nan, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_missing_values_and_weights_skipped(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, np.nan, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, np.nan],
+            }
+        )
+        out = df.groupby("g")["v"].weighted_mean(weights="w")
+        expected = pd.Series(
+            [10.0, 5.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_multiindex_grouper(self):
+        df = pd.DataFrame(
+            {
+                "g1": ["A", "A", "B", "B"],
+                "g2": [1, 2, 1, 2],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, 2.0],
+            }
+        )
+        out = df.groupby(["g1", "g2"])["v"].weighted_mean(weights="w")
+        idx = pd.MultiIndex.from_product([["A", "B"], [1, 2]], names=["g1", "g2"])
+        expected = pd.Series([10.0, 20.0, 5.0, 15.0], index=idx, name="v")
+        tm.assert_series_equal(out.sort_index(), expected)
+
+    def test_categorical_grouper_preserves_order(self):
+        cat = pd.Categorical(
+            ["Z", "A", "M", "B"], categories=["A", "B", "M", "Z"], ordered=True
+        )
+        df = pd.DataFrame(
+            {"g": cat, "v": [10.0, 20.0, 5.0, 15.0], "w": [1.0, 3.0, 2.0, 2.0]}
+        )
+        out = df.groupby("g")["v"].weighted_mean(weights="w")
+        expected = pd.Series(
+            [20.0, 15.0, 5.0, 10.0], index=pd.Index(cat.categories, name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_dataframe_groupby_single_column_selection_returns_series(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, 2.0],
+            }
+        )
+        gb = df.groupby("g")["v"]
+        out = gb.weighted_mean(weights=df["w"])  # Series weights
+        assert isinstance(out, pd.Series)
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_non_numeric_raises(self):
+        df = pd.DataFrame({"g": ["A", "A"], "v": ["x", "y"], "w": [1.0, 2.0]})
+        with pytest.raises(TypeError):
+            _ = df.groupby("g")["v"].weighted_mean(weights="w")
+
+    def test_length_mismatch_raises(self):
+        df = pd.DataFrame({"g": ["A", "A", "B"], "v": [1.0, 2.0, 3.0]})
+        with pytest.raises(
+            ValueError, match="weights must be the same length as the data"
+        ):
+            _ = df.groupby("g")["v"].weighted_mean(weights=[1.0, 2.0])
+
+    def test_weights_array_like_numpy(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+            }
+        )
+        w = np.array([1.0, 3.0, 2.0, 2.0])
+        out = df.groupby("g")["v"].weighted_mean(weights=w)
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_dataframe_groupby_method_exists_and_single_column_df_returns_series(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, 2.0],
+            }
+        )
+        gobj = df.groupby("g")
+        assert hasattr(gobj, "weighted_mean") and callable(gobj.weighted_mean)
+
+        # DataFrameGroupBy over a single-column DataFrame should return a Series
+        gb_df = df[["v"]].groupby("g")
+        out = gb_df.weighted_mean(weights=df["w"])  # weights align by index
+        assert isinstance(out, pd.Series)
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out, expected)
+
+    def test_numeric_only_parameter_is_accepted(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, 2.0],
+            }
+        )
+        out_none = df.groupby("g")["v"].weighted_mean(weights="w", numeric_only=None)
+        out_true = df.groupby("g")["v"].weighted_mean(weights="w", numeric_only=True)
+        expected = pd.Series(
+            [17.5, 10.0], index=pd.Index(["A", "B"], name="g"), name="v"
+        )
+        tm.assert_series_equal(out_none, expected)
+        tm.assert_series_equal(out_true, expected)
+
+    def test_dataframe_groupby_multi_column_raises_notimplemented(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [1.0, 3.0, 2.0, 2.0],
+            }
+        )
+        gb = df.groupby("g")[["v", "w"]]
+        with pytest.raises(NotImplementedError):
+            _ = gb.weighted_mean(weights="w")
+
+    def test_non_numeric_weights_raises(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+            }
+        )
+        bad_w = ["a", "b", "c", "d"]
+        with pytest.raises(TypeError):
+            _ = df.groupby("g")["v"].weighted_mean(weights=bad_w)
+
+    def test_all_zero_weights_return_nan_per_group(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+                "w": [0.0, 0.0, 0.0, 0.0],
+            }
+        )
+        result = df.groupby("g")["v"].weighted_mean(weights="w")
+        expected = pd.Series(
+            [np.nan, np.nan],
+            index=pd.Index(["A", "B"], name="g"),
+            name="v",
+        )
+        tm.assert_series_equal(result, expected)
+
+    def test_missing_weights_column_raises_keyerror(self):
+        df = pd.DataFrame(
+            {
+                "g": ["A", "A", "B", "B"],
+                "v": [10.0, 20.0, 5.0, 15.0],
+            }
+        )
+        with pytest.raises(KeyError):
+            _ = df.groupby("g")["v"].weighted_mean(weights="w")
+
+    def test_result_index_preserves_groupby_order(self):
+        df = pd.DataFrame(
+            {
+                "g": ["B", "A", "B", "C"],
+                "v": [1.0, 2.0, 3.0, 4.0],
+                "w": [1.0, 1.0, 3.0, 2.0],
+            }
+        )
+        result = df.groupby("g")["v"].weighted_mean(weights="w")
+        expected_index = df.groupby("g")["v"].count().index
+        tm.assert_index_equal(result.index, expected_index)

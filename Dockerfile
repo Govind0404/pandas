@@ -25,6 +25,7 @@ RUN case "$TARGETPLATFORM" in \
         sed -i "/^pyqt5/Id" /app/requirements-dev.txt \
         ;; \
     esac && \
+    python -m pip install --no-cache-dir cython numpy && \
     python -m pip install --no-cache-dir -r /app/requirements-dev.txt
 
 # Configure git safe directory to current workdir
