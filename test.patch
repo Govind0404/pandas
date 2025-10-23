@@ -232,15 +232,21 @@ index 0000000000..6ffbb327fc
 +        tm.assert_index_equal(result.index, expected_index)
 diff --git a/test.sh b/test.sh
 new file mode 100755
-index 0000000000..e118ed0c3d
+index 0000000000..86304fde45
 --- /dev/null
 +++ b/test.sh
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,33 @@
 +#!/bin/bash
 +set -euo pipefail
 +
 +echo "Running tests..."
 +python -V
++
++if [ ! -f .pandas_built ]; then
++  echo "Building pandas extensions (editable install)..."
++  python -m pip install --no-build-isolation --no-deps -e .
++  touch .pandas_built
++fi
 +
 +case "$1" in
 + base)

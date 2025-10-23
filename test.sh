@@ -4,6 +4,12 @@ set -euo pipefail
 echo "Running tests..."
 python -V
 
+if [ ! -f .pandas_built ]; then
+  echo "Building pandas extensions (editable install)..."
+  python -m pip install --no-build-isolation --no-deps -e .
+  touch .pandas_built
+fi
+
 case "$1" in
  base)
     # Run a couple of stable tests that should pass at base commit
